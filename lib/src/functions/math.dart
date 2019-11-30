@@ -18,7 +18,17 @@ final _random = math.Random();
 
 /// The global definitions of Sass math functions.
 final global = UnmodifiableListView([
-  _round, _ceil, _floor, _abs, _max, _min, _randomFunction, _unit, //
+  _round,
+  _ceil,
+  _floor,
+  _abs,
+  _max,
+  _min,
+  _randomFunction,
+  _sin,
+  _cos,
+  _atan2,
+  _unit,
   _percentage,
   _isUnitless.withName("unitless"),
   _compatible.withName("comparable")
@@ -26,7 +36,9 @@ final global = UnmodifiableListView([
 
 /// The Sass math module.
 final module = BuiltInModule("math", functions: [
-  _round, _ceil, _floor, _abs, _max, _min, _randomFunction, _unit,
+  _round, _ceil, _floor, _abs, _max, _min, _randomFunction,
+  _sin, _cos, _atan2,
+  _unit,
   _isUnitless, //
   _percentage, _compatible
 ]);
@@ -71,6 +83,25 @@ final _randomFunction = BuiltInCallable("random", r"$limit: null", (arguments) {
   return SassNumber(_random.nextInt(limit) + 1);
 });
 
+final _sin = _unitlessNumberFunction("sin", math.sin);
+final _cos = _unitlessNumberFunction("cos", math.cos);
+
+final _atan2 = BuiltInCallable("atan2", r"$y, $x", (arguments) {
+  var y = arguments[0].assertNumber("y");
+  var x = arguments[1].assertNumber("x");
+
+  y.assertNoUnits("y");
+  x.assertNoUnits("x");
+
+  var atan2 = math.atan2(y.value, x.value);
+
+  if (!atan2.isFinite) {
+    throw SassScriptException(_errorMessageNotFinite);
+  }
+
+  return SassNumber(atan2);
+});
+
 final _unit = BuiltInCallable("unit", r"$number", (arguments) {
   var number = arguments[0].assertNumber("number");
   return SassString(number.unitString, quotes: true);
@@ -88,6 +119,8 @@ final _compatible =
   return SassBoolean(number1.isComparableTo(number2));
 });
 
+final _errorMessageNotFinite = "The result is undefined.";
+
 /// Returns a [Callable] named [name] that transforms a number's value
 /// using [transform] and preserves its units.
 BuiltInCallable _numberFunction(String name, num transform(num value)) {
@@ -96,5 +129,22 @@ BuiltInCallable _numberFunction(String name, num transform(num value)) {
     return SassNumber.withUnits(transform(number.value),
         numeratorUnits: number.numeratorUnits,
         denominatorUnits: number.denominatorUnits);
+  });
+}
+
+/// Returns a [Callable] named [name] applying the [transform] to a
+/// unitless number. The result is unitless, too.
+BuiltInCallable _unitlessNumberFunction(String name, num transform(num value)) {
+  return BuiltInCallable(name, r"$number", (arguments) {
+    var number = arguments[0].assertNumber("number");
+
+    number.assertNoUnits("number");
+    var result = transform(number.value);
+
+    if (!result.isFinite) {
+      throw SassScriptException(_errorMessageNotFinite);
+    }
+
+    return SassNumber(result);
   });
 }
